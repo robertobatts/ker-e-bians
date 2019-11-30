@@ -35,6 +35,61 @@ const (
 	usersCols      = " id, name, surname, email, password "
 )
 
+
+type OptimizedTrip struct {
+	Code  string `json:"code"`
+	Trips []struct {
+		Distance float64 `json:"distance"`
+		Duration float64 `json:"duration"`
+		Geometry struct {
+			Coordinates [][]float64 `json:"coordinates"`
+			Type        string      `json:"type"`
+		} `json:"geometry"`
+		Legs []struct {
+			Distance float64 `json:"distance"`
+			Duration float64 `json:"duration"`
+			Steps    []struct {
+				Distance    float64 `json:"distance"`
+				DrivingSide string  `json:"driving_side"`
+				Duration    float64 `json:"duration"`
+				Geometry    struct {
+					Coordinates [][]float64 `json:"coordinates"`
+					Type        string      `json:"type"`
+				} `json:"geometry"`
+				Intersections []struct {
+					Bearings []int     `json:"bearings"`
+					Entry    []bool    `json:"entry"`
+					Location []float64 `json:"location"`
+					Out      int       `json:"out"`
+				} `json:"intersections"`
+				Maneuver struct {
+					BearingAfter  int       `json:"bearing_after"`
+					BearingBefore int       `json:"bearing_before"`
+					Instruction   string    `json:"instruction"`
+					Location      []float64 `json:"location"`
+					Type          string    `json:"type"`
+				} `json:"maneuver"`
+				Mode   string  `json:"mode"`
+				Name   string  `json:"name"`
+				Ref    string  `json:"ref"`
+				Weight float64 `json:"weight"`
+			} `json:"steps"`
+			Summary string  `json:"summary"`
+			Weight  float64 `json:"weight"`
+		} `json:"legs"`
+		Weight     float64 `json:"weight"`
+		WeightName string  `json:"weight_name"`
+	} `json:"trips"`
+	Waypoints []struct {
+		Distance      float64   `json:"distance"`
+		Location      []float64 `json:"location"`
+		Name          string    `json:"name"`
+		TripsIndex    int       `json:"trips_index"`
+		WaypointIndex int       `json:"waypoint_index"`
+	} `json:"waypoints"`
+}
+
+
 // Row is an interface which is satisfied by sdb.Row and db.Rows. It allows a
 // db result to be scanned into a struct.
 type Row interface {
@@ -263,7 +318,7 @@ func respondWithError(w http.ResponseWriter, code int, msg string) {
 // respondwithJSON write json response format
 func respondwithJSON(w http.ResponseWriter, code int, payload interface{}) {
 	response, _ := json.Marshal(payload)
-	fmt.Printf("Responding with code:%+v and payload:%+v\n", code, payload)
+	//fmt.Printf("Responding with code:%+v and payload:%+v\n", code, payload)
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
@@ -331,10 +386,10 @@ func scanUsers(row Row) (*User, error) {
 	return &result, err
 }
 
-func findMapBoxPath(coordinates [][]float64) {
+func findMapBoxPath(coordinates [][]float64) OptimizedTrip {
 	url := "https://api.mapbox.com/optimized-trips/v1/mapbox/driving/"
 	for i := 0; i < len(coordinates); i++ {
-		url += fmt.Sprintf("%f", coordinates[i][0]) + "," + fmt.Sprint("%f", coordinates[i][1])
+		url += fmt.Sprintf("%f", coordinates[i][0]) + "," + fmt.Sprintf("%f", coordinates[i][1])
 		if i != len(coordinates) - 1 {
 			url += ";"
 		}
@@ -343,26 +398,33 @@ func findMapBoxPath(coordinates [][]float64) {
 	url += "?steps=true&geometries=geojson&access_token=pk.eyJ1Ijoicm9iZXJ0b2JhdHRzIiwiYSI6ImNrM2xraXd0NzBkeWEzbm40YTVnYTFhb2kifQ.FiHpv9X4KvHDi8tFjIgZVg"
 
 	fmt.Println(url)
-	client := &http.Client{}
-	req, _ := http.NewRequest("GET", url, nil)
-	resp, _ := client.Do(req)
+	resp, _ := http.Get(url)
 	fmt.Println(resp)
-	//var featureCollection FeatureCollection
-	//_ := json.NewDecoder(resp.Body).Decode(&featureCollection)
+	
+	var optimizedTrip OptimizedTrip
+	err := json.NewDecoder(resp.Body).Decode(&optimizedTrip)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	return optimizedTrip
 }
 
 func routeJourney(w http.ResponseWriter, r *http.Request) {
 	fmt.Printf("routeJourney called\n")
-	var journeyReq JourneyReq
-	json.NewDecoder(r.Body).Decode(&journeyReq)
-	defer r.Body.Close()
 
-	/*fmt.Printf("journeyReq: %+v\n", journeyReq)
-	result := GetParkingSpots(journeyReq.Latitude,journeyReq.Longitude,journeyReq.Distance)
+	startLat, _ := strconv.ParseFloat(r.URL.Query().Get("startLat"), 64)
+	startLong, _ := strconv.ParseFloat(r.URL.Query().Get("startLong"), 64)
+	endLat, _ := strconv.ParseFloat(r.URL.Query().Get("endLat"), 64)
+	endLong, _ := strconv.ParseFloat(r.URL.Query().Get("endLong"), 64)
+
+	result := findMapBoxPath([][]float64{
+		{startLat, startLong},
+		{endLat, endLong},
+	})
 
 	msg := fmt.Sprintf("successfully run")
 	fmt.Printf("msg:%s\n", msg)
-	respondwithJSON(w, http.StatusOK, result)*/
+	respondwithJSON(w, http.StatusOK, result)
 }
 
 func parkingSpots(w http.ResponseWriter, r *http.Request) {
