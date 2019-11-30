@@ -11,6 +11,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"strconv"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
@@ -330,6 +331,26 @@ func scanUsers(row Row) (*User, error) {
 	return &result, err
 }
 
+func findMapBoxPath(coordinates [][]float64) {
+	url := "https://api.mapbox.com/optimized-trips/v1/mapbox/driving/"
+	for i := 0; i < len(coordinates); i++ {
+		url += fmt.Sprintf("%f", coordinates[i][0]) + "," + fmt.Sprint("%f", coordinates[i][1])
+		if i != len(coordinates) - 1 {
+			url += ";"
+		}
+	}
+
+	url += "?steps=true&geometries=geojson&access_token=pk.eyJ1Ijoicm9iZXJ0b2JhdHRzIiwiYSI6ImNrM2xraXd0NzBkeWEzbm40YTVnYTFhb2kifQ.FiHpv9X4KvHDi8tFjIgZVg"
+
+	fmt.Println(url)
+	client := &http.Client{}
+	req, _ := http.NewRequest("GET", url, nil)
+	resp, _ := client.Do(req)
+	fmt.Println(resp)
+	//var featureCollection FeatureCollection
+	//_ := json.NewDecoder(resp.Body).Decode(&featureCollection)
+}
+
 func routeJourney(w http.ResponseWriter, r *http.Request) {
 	fmt.Printf("routeJourney called\n")
 	var journeyReq JourneyReq
@@ -345,13 +366,10 @@ func routeJourney(w http.ResponseWriter, r *http.Request) {
 }
 
 func parkingSpots(w http.ResponseWriter, r *http.Request) {
-	fmt.Printf("parkingReq called\n")
-	var parkingReq ParkingSpotsReq
-	json.NewDecoder(r.Body).Decode(&parkingReq)
-	defer r.Body.Close()
-
-	fmt.Printf("parkingReq: %+v\n", parkingReq)
-	result := GetParkingSpots(parkingReq.Latitude,parkingReq.Longitude,parkingReq.Distance)
+	latitude, _ := strconv.ParseFloat(r.URL.Query().Get("latitude"), 64)
+	longitude, _ := strconv.ParseFloat(r.URL.Query().Get("longitude"), 64)
+	distance, _ := strconv.ParseFloat(r.URL.Query().Get("distance"), 64)
+	result := GetParkingSpots(latitude, longitude, distance)
 
 	msg := fmt.Sprintf("successfully run")
 	fmt.Printf("msg:%s\n", msg)
