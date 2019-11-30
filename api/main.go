@@ -89,7 +89,6 @@ func CallKerbspaceAPI(latitude1 float64, longitude1 float64, latitude2 float64, 
 	if err != nil {
 		fmt.Println(err.Error())
 	}
-	fmt.Println(featureCollection)
 	return featureCollection
 }
 
@@ -101,7 +100,8 @@ func GetParkingSpots(latitude float64, longitude float64, distance float64) []Fe
 
 	features := CallKerbspaceAPI(lat1, lon1, lat2, lon2).Features
 
-	for _, feature := range features {
+	for i := 0; i < len(features); i++ {
+		feature := &features[i]
 		var newCoord = [][]float64{
 			{feature.Geometry.Coordinates[0][1], feature.Geometry.Coordinates[0][0]},
 			{feature.Geometry.Coordinates[1][1], feature.Geometry.Coordinates[1][0]},
@@ -142,7 +142,8 @@ func deg2rad(deg float64) float64 {
 
 func main() {
 
-
-	fmt.Println(GetParkingSpots(51.55815224558373,-0.17980040235097644,0.05))
-	//GetParkingSpots()	
+	features := GetParkingSpots(51.55815224558373,-0.17980040235097644,0.05)
+	json, _ := json.Marshal(&features)
+	fmt.Println(string(json))
+		
 }
