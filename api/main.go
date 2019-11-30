@@ -205,16 +205,23 @@ func GetParkingSpots(latitude float64, longitude float64, distance float64) []Fe
 
 	for i := 0; i < len(features); i++ {
 		feature := &features[i]
-		var newCoord = [][]float64{
-			{feature.Geometry.Coordinates[0][1], feature.Geometry.Coordinates[0][0]},
-			{feature.Geometry.Coordinates[1][1], feature.Geometry.Coordinates[1][0]},
-		}
+		var newCoord = swapCoordinates(feature.Geometry.Coordinates)
+
 		feature.Geometry.Coordinates = newCoord
 		carSpaces := getDistanceFromLatLonInKm(newCoord[0][0], newCoord[0][1], newCoord[1][0], newCoord[1][1]) / avgCarLength
 		feature.Properties.CarSpaces = int(carSpaces)
 	}
 
 	return features
+}
+
+func swapCoordinates(coordinates [][]float64) [][]float64 {
+	for i := 0; i < len(coordinates); i++ {
+		a := coordinates[i][0]
+		coordinates[i][0] = coordinates[i][1]
+		coordinates[i][1] = a
+	}
+	return coordinates
 }
 
 func getDistanceFromLatLonInKm(lat1 float64, lon1 float64, lat2 float64, lon2 float64) float64 {
@@ -389,7 +396,7 @@ func scanUsers(row Row) (*User, error) {
 func findMapBoxPath(coordinates [][]float64) OptimizedTrip {
 	url := "https://api.mapbox.com/optimized-trips/v1/mapbox/driving/"
 	for i := 0; i < len(coordinates); i++ {
-		url += fmt.Sprintf("%f", coordinates[i][0]) + "," + fmt.Sprintf("%f", coordinates[i][1])
+		url += fmt.Sprintf("%f", coordinates[i][1]) + "," + fmt.Sprintf("%f", coordinates[i][0])
 		if i != len(coordinates) - 1 {
 			url += ";"
 		}
@@ -406,6 +413,13 @@ func findMapBoxPath(coordinates [][]float64) OptimizedTrip {
 	if err != nil {
 		fmt.Println(err.Error())
 	}
+
+	for i := 0; i < len(optimizedTrip.Trips); i++ {
+		coord := optimizedTrip.Trips[i].Geometry.Coordinates
+		coord = swapCoordinates(coord)
+
+	}
+//		fmt.Printf("%f\t%f\t%f\t%f\t", coord[0][0],coord[0][1],coord[0][0],coord[0][0],)
 	return optimizedTrip
 }
 
