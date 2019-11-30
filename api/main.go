@@ -55,6 +55,12 @@ type JourneyReq struct {
 	EndLat    float32 `json:"end_lat"`
 }
 
+type ParkingSpotsReq struct {
+	Latitude 		float64 `json:"latitude"`
+	Longitude  	float64 `json:"longitude"`
+	Distance		float64 `json:"distance"`
+}
+
 type FeatureCollection struct {
 	Type     string    `json:"type"`
 	Features []Feature `json:"features"`
@@ -192,6 +198,7 @@ func init() {
 func routers() *chi.Mux {
 	router.Post("/users", createUser)
 	router.Get("/route", routeJourney)
+	router.Get("/parkingspots", parkingSpots)
 
 	return router
 }
@@ -329,11 +336,24 @@ func routeJourney(w http.ResponseWriter, r *http.Request) {
 	json.NewDecoder(r.Body).Decode(&journeyReq)
 	defer r.Body.Close()
 
-	fmt.Printf("journeyReq: %+v\n", journeyReq)
-	fmt.Println(GetParkingSpots(51.55815224558373,-0.17980040235097644,0.05)		
-)
+	/*fmt.Printf("journeyReq: %+v\n", journeyReq)
+	result := GetParkingSpots(journeyReq.Latitude,journeyReq.Longitude,journeyReq.Distance)
 
 	msg := fmt.Sprintf("successfully run")
 	fmt.Printf("msg:%s\n", msg)
-	respondwithJSON(w, http.StatusOK, journeyReq)
+	respondwithJSON(w, http.StatusOK, result)*/
+}
+
+func parkingSpots(w http.ResponseWriter, r *http.Request) {
+	fmt.Printf("parkingReq called\n")
+	var parkingReq ParkingSpotsReq
+	json.NewDecoder(r.Body).Decode(&parkingReq)
+	defer r.Body.Close()
+
+	fmt.Printf("parkingReq: %+v\n", parkingReq)
+	result := GetParkingSpots(parkingReq.Latitude,parkingReq.Longitude,parkingReq.Distance)
+
+	msg := fmt.Sprintf("successfully run")
+	fmt.Printf("msg:%s\n", msg)
+	respondwithJSON(w, http.StatusOK, result)
 }
