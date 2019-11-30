@@ -17,17 +17,14 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
-var (
-	rEarth       = 6371.0 //radius of Earth in km
-	avgCarLength = 0.005  //average car length in km
-)
-
 var apiKey string
 
 var router *chi.Mux
 var db *sql.DB
 
 const (
+	rEarth         = 6371.0 //radius of Earth in km
+	avgCarLength   = 0.005  //average car length in km
 	port           = 8005
 	dbName         = "kerbspace"
 	dbPass         = ""
