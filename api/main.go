@@ -35,23 +35,22 @@ const (
 	usersCols      = " id, name, surname, email, password "
 )
 
-
-type OptimizedTrip struct {
-	Code  string `json:"code"`
-	Trips []struct {
+type Directions struct {
+	Code   string `json:"code"`
+	Routes []struct {
 		Distance float64 `json:"distance"`
-		Duration float64 `json:"duration"`
+		Duration int     `json:"duration"`
 		Geometry struct {
 			Coordinates [][]float64 `json:"coordinates"`
 			Type        string      `json:"type"`
 		} `json:"geometry"`
 		Legs []struct {
 			Distance float64 `json:"distance"`
-			Duration float64 `json:"duration"`
+			Duration int     `json:"duration"`
 			Steps    []struct {
 				Distance    float64 `json:"distance"`
 				DrivingSide string  `json:"driving_side"`
-				Duration    float64 `json:"duration"`
+				Duration    int     `json:"duration"`
 				Geometry    struct {
 					Coordinates [][]float64 `json:"coordinates"`
 					Type        string      `json:"type"`
@@ -69,26 +68,23 @@ type OptimizedTrip struct {
 					Location      []float64 `json:"location"`
 					Type          string    `json:"type"`
 				} `json:"maneuver"`
-				Mode   string  `json:"mode"`
-				Name   string  `json:"name"`
-				Ref    string  `json:"ref"`
-				Weight float64 `json:"weight"`
+				Mode   string `json:"mode"`
+				Name   string `json:"name"`
+				Weight int    `json:"weight"`
 			} `json:"steps"`
-			Summary string  `json:"summary"`
-			Weight  float64 `json:"weight"`
+			Summary string `json:"summary"`
+			Weight  int    `json:"weight"`
 		} `json:"legs"`
-		Weight     float64 `json:"weight"`
-		WeightName string  `json:"weight_name"`
-	} `json:"trips"`
+		Weight     int    `json:"weight"`
+		WeightName string `json:"weight_name"`
+	} `json:"routes"`
+	UUID      string `json:"uuid"`
 	Waypoints []struct {
-		Distance      float64   `json:"distance"`
-		Location      []float64 `json:"location"`
-		Name          string    `json:"name"`
-		TripsIndex    int       `json:"trips_index"`
-		WaypointIndex int       `json:"waypoint_index"`
+		Distance float64   `json:"distance"`
+		Location []float64 `json:"location"`
+		Name     string    `json:"name"`
 	} `json:"waypoints"`
 }
-
 
 // Row is an interface which is satisfied by sdb.Row and db.Rows. It allows a
 // db result to be scanned into a struct.
@@ -220,6 +216,8 @@ func swapCoordinates(coordinates [][]float64) [][]float64 {
 		a := coordinates[i][0]
 		coordinates[i][0] = coordinates[i][1]
 		coordinates[i][1] = a
+
+		fmt.Printf("%f,%f\n", coordinates[i][0], coordinates[i][1])
 	}
 	return coordinates
 }
@@ -393,8 +391,8 @@ func scanUsers(row Row) (*User, error) {
 	return &result, err
 }
 
-func findMapBoxPath(coordinates [][]float64) OptimizedTrip {
-	url := "https://api.mapbox.com/optimized-trips/v1/mapbox/driving/"
+func callMapBoxAPI(coordinates [][]float64) Directions {
+	url := "https://api.mapbox.com/directions/v5/mapbox/driving/"
 	for i := 0; i < len(coordinates); i++ {
 		url += fmt.Sprintf("%f", coordinates[i][1]) + "," + fmt.Sprintf("%f", coordinates[i][0])
 		if i != len(coordinates) - 1 {
@@ -408,19 +406,24 @@ func findMapBoxPath(coordinates [][]float64) OptimizedTrip {
 	resp, _ := http.Get(url)
 	fmt.Println(resp)
 	
-	var optimizedTrip OptimizedTrip
-	err := json.NewDecoder(resp.Body).Decode(&optimizedTrip)
+	var directions Directions
+	err := json.NewDecoder(resp.Body).Decode(&directions)
 	if err != nil {
 		fmt.Println(err.Error())
 	}
 
-	for i := 0; i < len(optimizedTrip.Trips); i++ {
-		coord := optimizedTrip.Trips[i].Geometry.Coordinates
-		coord = swapCoordinates(coord)
+	return directions
+}
 
-	}
-//		fmt.Printf("%f\t%f\t%f\t%f\t", coord[0][0],coord[0][1],coord[0][0],coord[0][0],)
-	return optimizedTrip
+func getPath(coordinates[][] float64) [][]float64 {
+
+	directions := callMapBoxAPI(coordinates)
+	//just to keep it simple, we give the user only one path
+	//for i := 0; i < len(optimizedTrip.Trips); i++ {
+		coord := directions.Routes[0].Geometry.Coordinates
+		coord = swapCoordinates(coord)
+	//}
+	return coord
 }
 
 func routeJourney(w http.ResponseWriter, r *http.Request) {
@@ -431,7 +434,7 @@ func routeJourney(w http.ResponseWriter, r *http.Request) {
 	endLat, _ := strconv.ParseFloat(r.URL.Query().Get("endLat"), 64)
 	endLong, _ := strconv.ParseFloat(r.URL.Query().Get("endLong"), 64)
 
-	result := findMapBoxPath([][]float64{
+	result := getPath([][]float64{
 		{startLat, startLong},
 		{endLat, endLong},
 	})
