@@ -193,22 +193,49 @@ func CallKerbspaceAPI(latitude1 float64, longitude1 float64, latitude2 float64, 
 	return featureCollection
 }
 
-func GetParkingSpots(latitude float64, longitude float64, distance float64) []Feature {
+func GetParkingSpots(latitude float64, longitude float64, distance float64, reason string) []Feature {
+
+	if distance == 0 {
+		distance = 0.25
+	}
+
 	lat1, lon1 := addKmDistanceToCoordinates(latitude, longitude, -distance, -distance)
 	lat2, lon2 := addKmDistanceToCoordinates(latitude, longitude, distance, distance)
 
 	features := CallKerbspaceAPI(lat1, lon1, lat2, lon2).Features
 
+	newFeatures := []Feature{}
 	for i := 0; i < len(features); i++ {
 		feature := &features[i]
-		var newCoord = swapCoordinates(feature.Geometry.Coordinates)
+		if matchReason(*feature, reason) {
+			var newCoord = swapCoordinates(feature.Geometry.Coordinates)
 
-		feature.Geometry.Coordinates = newCoord
-		carSpaces := getDistanceFromLatLonInKm(newCoord[0][0], newCoord[0][1], newCoord[1][0], newCoord[1][1]) / avgCarLength
-		feature.Properties.CarSpaces = int(carSpaces)
+			feature.Geometry.Coordinates = newCoord
+			carSpaces := getDistanceFromLatLonInKm(newCoord[0][0], newCoord[0][1], newCoord[1][0], newCoord[1][1]) / avgCarLength
+			feature.Properties.CarSpaces = int(carSpaces)
+
+			newFeatures = append(newFeatures, *feature)
+		}
 	}
 
-	return features
+	return newFeatures
+}
+
+func matchReason(feature Feature, reason string) bool {
+	if reason == "" {
+		return true
+	}
+
+	regulations := feature.Properties.Regulations
+	for _, regulation :=  range regulations {
+		if regulation.Rule.Reason == "unrestricted" {
+			return true
+		}
+		if regulation.Rule.Reason == reason {
+			return true
+		}
+	}
+	return false
 }
 
 func swapCoordinates(coordinates [][]float64) [][]float64 {
@@ -427,13 +454,15 @@ func getPath(coordinates[][] float64) [][]float64 {
 	return coord
 }
 
-func getPathWithPark(startLat float64, startLong float64, endLat float64, endLong float64, distance float64) [][]float64 {
-	parkingSpots := GetParkingSpots(endLat, endLong, distance)
+func getPathWithPark(startLat float64, startLong float64, endLat float64, endLong float64, distance float64, reason string) [][]float64 {
+	parkingSpots := GetParkingSpots(endLat, endLong, distance, reason)
 
 	coordinates := [][]float64{{startLat, startLong}}
 
+	i := 0
 	for _, parkingSpot := range parkingSpots {
-		if parkingSpot.Properties.CarSpaces >= 8 {
+		if parkingSpot.Properties.CarSpaces >= 8 && i < 22 {
+			i++
 			coordinates = append(coordinates, parkingSpot.Geometry.Coordinates[0])
 		}
 	}
@@ -469,9 +498,10 @@ func routeWithPark(w http.ResponseWriter, r *http.Request) {
 	endLat, _ := strconv.ParseFloat(r.URL.Query().Get("endLat"), 64)
 	endLong, _ := strconv.ParseFloat(r.URL.Query().Get("endLong"), 64)
 	distance, _ := strconv.ParseFloat(r.URL.Query().Get("distance"), 64)
+	reason := r.URL.Query().Get("reason")
 
 
-	result := getPathWithPark(startLat, startLong, endLat, endLong, distance)
+	result := getPathWithPark(startLat, startLong, endLat, endLong, distance, reason)
 
 	msg := fmt.Sprintf("successfully run")
 	fmt.Printf("msg:%s\n", msg)
@@ -483,7 +513,8 @@ func parkingSpots(w http.ResponseWriter, r *http.Request) {
 	latitude, _ := strconv.ParseFloat(r.URL.Query().Get("latitude"), 64)
 	longitude, _ := strconv.ParseFloat(r.URL.Query().Get("longitude"), 64)
 	distance, _ := strconv.ParseFloat(r.URL.Query().Get("distance"), 64)
-	result := GetParkingSpots(latitude, longitude, distance)
+	reason := r.URL.Query().Get("reason")
+	result := GetParkingSpots(latitude, longitude, distance, reason)
 
 	msg := fmt.Sprintf("successfully run")
 	fmt.Printf("msg:%s\n", msg)
