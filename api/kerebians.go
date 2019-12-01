@@ -217,7 +217,7 @@ func swapCoordinates(coordinates [][]float64) [][]float64 {
 		coordinates[i][0] = coordinates[i][1]
 		coordinates[i][1] = a
 
-		fmt.Printf("%f,%f\n", coordinates[i][0], coordinates[i][1])
+		fmt.Printf("%f,%f,abc%v\n", coordinates[i][0], coordinates[i][1], i)
 	}
 	return coordinates
 }
@@ -258,7 +258,8 @@ func init() {
 
 func routers() *chi.Mux {
 	router.Post("/users", createUser)
-	router.Get("/route", routeJourney)
+	router.Get("/route", route)
+	router.Get("/routewithpark", routeWithPark)
 	router.Get("/parkingspots", parkingSpots)
 
 	return router
@@ -426,8 +427,23 @@ func getPath(coordinates[][] float64) [][]float64 {
 	return coord
 }
 
-func routeJourney(w http.ResponseWriter, r *http.Request) {
-	fmt.Printf("routeJourney called\n")
+func getPathWithPark(startLat float64, startLong float64, endLat float64, endLong float64, distance float64) [][]float64 {
+	parkingSpots := GetParkingSpots(endLat, endLong, distance)
+
+	coordinates := [][]float64{{startLat, startLong}}
+
+	for _, parkingSpot := range parkingSpots {
+		if parkingSpot.Properties.CarSpaces >= 8 {
+			coordinates = append(coordinates, parkingSpot.Geometry.Coordinates[0])
+		}
+	}
+	coordinates = append(coordinates, []float64{endLat, endLong})
+
+	return getPath(coordinates)
+}
+
+func route(w http.ResponseWriter, r *http.Request) {
+	fmt.Printf("route called\n")
 
 	startLat, _ := strconv.ParseFloat(r.URL.Query().Get("startLat"), 64)
 	startLong, _ := strconv.ParseFloat(r.URL.Query().Get("startLong"), 64)
@@ -436,6 +452,7 @@ func routeJourney(w http.ResponseWriter, r *http.Request) {
 
 	result := getPath([][]float64{
 		{startLat, startLong},
+		//{51.522050, -0.108824},
 		{endLat, endLong},
 	})
 
@@ -444,7 +461,25 @@ func routeJourney(w http.ResponseWriter, r *http.Request) {
 	respondwithJSON(w, http.StatusOK, result)
 }
 
+func routeWithPark(w http.ResponseWriter, r *http.Request) {
+	fmt.Printf("routeWithPark called\n")
+
+	startLat, _ := strconv.ParseFloat(r.URL.Query().Get("startLat"), 64)
+	startLong, _ := strconv.ParseFloat(r.URL.Query().Get("startLong"), 64)
+	endLat, _ := strconv.ParseFloat(r.URL.Query().Get("endLat"), 64)
+	endLong, _ := strconv.ParseFloat(r.URL.Query().Get("endLong"), 64)
+	distance, _ := strconv.ParseFloat(r.URL.Query().Get("distance"), 64)
+
+
+	result := getPathWithPark(startLat, startLong, endLat, endLong, distance)
+
+	msg := fmt.Sprintf("successfully run")
+	fmt.Printf("msg:%s\n", msg)
+	respondwithJSON(w, http.StatusOK, result)
+}
+
 func parkingSpots(w http.ResponseWriter, r *http.Request) {
+	fmt.Printf("parkingSpots called\n")
 	latitude, _ := strconv.ParseFloat(r.URL.Query().Get("latitude"), 64)
 	longitude, _ := strconv.ParseFloat(r.URL.Query().Get("longitude"), 64)
 	distance, _ := strconv.ParseFloat(r.URL.Query().Get("distance"), 64)
