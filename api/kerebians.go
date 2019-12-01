@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 	"strconv"
+	"sort"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
@@ -244,7 +245,7 @@ func swapCoordinates(coordinates [][]float64) [][]float64 {
 		coordinates[i][0] = coordinates[i][1]
 		coordinates[i][1] = a
 
-		fmt.Printf("%f,%f,abc%v\n", coordinates[i][0], coordinates[i][1], i)
+		//fmt.Printf("%f,%f,abc%v\n", coordinates[i][0], coordinates[i][1], i)
 	}
 	return coordinates
 }
@@ -456,15 +457,17 @@ func getPath(coordinates[][] float64) [][]float64 {
 
 func getPathWithPark(startLat float64, startLong float64, endLat float64, endLong float64, distance float64, reason string) [][]float64 {
 	parkingSpots := GetParkingSpots(endLat, endLong, distance, reason)
-
+	
 	coordinates := [][]float64{{startLat, startLong}}
 
-	i := 0
-	for _, parkingSpot := range parkingSpots {
-		if parkingSpot.Properties.CarSpaces >= 8 && i < 22 {
-			i++
-			coordinates = append(coordinates, parkingSpot.Geometry.Coordinates[0])
-		}
+	sort.Slice(parkingSpots, func(i, j int) bool {return parkingSpots[i].Properties.CarSpaces > parkingSpots[j].Properties.CarSpaces})
+
+	size := len(parkingSpots)
+	if (size > 21) {
+		size = 21
+	}
+	for i := 0; i < size; i++ {
+		coordinates = append(coordinates, parkingSpots[i].Geometry.Coordinates[0])
 	}
 	coordinates = append(coordinates, []float64{endLat, endLong})
 
